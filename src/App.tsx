@@ -13,7 +13,6 @@ import Contact from './components/Contact';
 import Footer from './components/Footer';
 import AdminPanel from './components/AdminPanel';
 import AdminLogin from './components/AdminLogin';
-import DeveloperHub from './components/DeveloperHub';
 
 import { 
   INITIAL_FUEL_PRICES, 
@@ -241,9 +240,6 @@ export default function App() {
 
             {/* 2.5. Company Branches & IT Tech Ecosystem Section */}
             <CompanyBranches branches={branches} />
-
-            {/* 2.7. Go Backend Architecture & Interactive Tech Hub */}
-            <DeveloperHub />
 
             {/* 3. Operational Filtered Energy Services */}
             <Services 

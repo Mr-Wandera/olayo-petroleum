@@ -24,7 +24,6 @@ export default function Header({
     { id: 'home', label: 'Home' },
     { id: 'about', label: 'About' },
     { id: 'branches', label: 'Branches' },
-    { id: 'developer-hub', label: 'Backend' },
     { id: 'services', label: 'Services' },
     { id: 'corporate', label: 'Corporate' },
     { id: 'safety', label: 'Safety' },

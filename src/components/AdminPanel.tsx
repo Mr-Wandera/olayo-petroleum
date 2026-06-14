@@ -6,6 +6,7 @@ import {
   CreditCard, ShieldAlert, Wifi, WifiOff, Users, ArrowRight, Zap, FileText, Smartphone,
   TrendingUp, AlertTriangle, ShieldCheck, Activity, Receipt, Printer, Download, Settings, Search
 } from 'lucide-react';
+import DeveloperHub from './DeveloperHub';
 
 interface AdminPanelProps {
   fuelPrices: FuelPrice[];
@@ -38,7 +39,7 @@ export default function AdminPanel({
   branches,
   setBranches
 }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'prices' | 'gallery' | 'news' | 'testimonials' | 'inquiries' | 'branches' | 'payments_erp' | 'transactions'>('prices');
+  const [activeTab, setActiveTab] = useState<'prices' | 'gallery' | 'news' | 'testimonials' | 'inquiries' | 'branches' | 'payments_erp' | 'transactions' | 'developer_hub'>('prices');
 
   // --- 0. Payments, B2B Accounts & NFC Card State ---
   const [corporateAccounts, setCorporateAccounts] = useState(() => {
@@ -595,6 +596,18 @@ export default function AdminPanel({
           >
             <Receipt className="w-4 h-4 text-emerald-400" />
             <span>Transactions Ledger</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('developer_hub')}
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'developer_hub'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-55 dark:hover:bg-neutral-950'
+            }`}
+          >
+            <Settings className="w-4 h-4 text-amber-500 animate-spin-slow" />
+            <span>Developer Systems Core</span>
           </button>
 
         </div>
@@ -2846,6 +2859,21 @@ export default function AdminPanel({
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* --- 9. DEVELOPER SYSTEMS CORE --- */}
+        {activeTab === 'developer_hub' && (
+          <div className="space-y-6 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-3xl p-6 sm:p-8 shadow-sm">
+            <div className="border-b border-neutral-200 dark:border-neutral-850 pb-5 text-left">
+              <h3 className="text-lg font-black text-neutral-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" /> Administrative System Architecture Sandbox
+              </h3>
+              <p className="text-xs text-neutral-450 dark:text-neutral-400 mt-1">
+                Explore the secure backend specification decoupled from public environments. This developer dashboard simulates physical B2B cashless taps, live pipeline queues, and core GORM database schema structures inside the restricted perimeter.
+              </p>
+            </div>
+            <DeveloperHub />
           </div>
         )}
 
