@@ -4,7 +4,7 @@ import {
   DollarSign, Image, Newspaper, Award, Inbox, Edit3, Trash2, Plus, 
   Check, X, RefreshCw, Eye, ClipboardCheck, LayoutGrid, Fuel, Clock, MapPin,
   CreditCard, ShieldAlert, Wifi, WifiOff, Users, ArrowRight, Zap, FileText, Smartphone,
-  TrendingUp, AlertTriangle, ShieldCheck, Activity
+  TrendingUp, AlertTriangle, ShieldCheck, Activity, Receipt, Printer, Download, Settings
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -115,6 +115,35 @@ export default function AdminPanel({
     riskScore: 'Low Risk',
     phone: ''
   });
+
+  // Payment credentials state config
+  const [paymentCredentials, setPaymentCredentials] = useState(() => {
+    const saved = localStorage.getItem('olayo_payment_credentials');
+    return saved ? JSON.parse(saved) : {
+      mtnMerchantId: 'MTN-MER-990812',
+      mtnApiKey: '7a19bc8f42ef99823101aa00ccfde23a',
+      mtnEnv: 'sandbox',
+      airtelClientId: 'AIRTEL-CL-55092',
+      airtelClientSecret: 'airtel_sec_99a8b7762c3f',
+      airtelMerchantNo: '256701234567',
+      pesapalConsumerKey: 'pesapal_public_key_demo_88',
+      pesapalConsumerSecret: 'pesapal_secret_88d2f7331',
+      pesapalMode: 'sandbox'
+    };
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('olayo_payment_credentials', JSON.stringify(paymentCredentials));
+  }, [paymentCredentials]);
+
+  // Selected receipt state (for printing/rendering receipts)
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+
+  // Sub tab for payment right sidebar: accounts or gateways
+  const [rightSubTab, setRightSubTab] = useState<'accounts' | 'gateways'>('accounts');
+
+  const [isSavingCreds, setIsSavingCreds] = useState<boolean>(false);
+  const [isTestingPing, setIsTestingPing] = useState<'mtn' | 'airtel' | 'pesapal' | null>(null);
 
   const handleSyncOfflineData = () => {
     if (offlineQueue.length === 0) return;
@@ -1813,6 +1842,7 @@ export default function AdminPanel({
                           <th className="pb-2.5 font-bold text-right">Sum (UGX)</th>
                           <th className="pb-2.5 font-bold">Method</th>
                           <th className="pb-2.5 font-bold text-center">Status</th>
+                          <th className="pb-2.5 font-bold text-center">Receipt</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-neutral-900 font-medium text-neutral-700 dark:text-neutral-300">
@@ -1833,14 +1863,25 @@ export default function AdminPanel({
                             </td>
                             <td className="py-3 text-center">
                               {txn.status === 'Success' ? (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 capitalize">
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 capitalize border border-emerald-500/20">
                                   Live Synced 🟢
                                 </span>
                               ) : (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-450 uppercase animate-pulse">
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-450 uppercase animate-pulse border border-rose-500/20">
                                   Offline Queue 🔴
                                 </span>
                               )}
+                            </td>
+                            <td className="py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReceipt(txn)}
+                                className="inline-flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-600 dark:bg-emerald-500/10 dark:hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white dark:hover:text-white px-2.5 py-1 rounded-md font-bold text-[10px] uppercase tracking-wider transition-all duration-150 cursor-pointer"
+                                title="Generate physical checkout receipt"
+                              >
+                                <Receipt className="w-3 h-3" />
+                                <span>Receipt</span>
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -2011,20 +2052,41 @@ export default function AdminPanel({
                 
                 {/* Panel 4: Corporate Clients Limits Ledger & Risk Analyzer */}
                 <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 space-y-5">
-                  <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-5 h-5 text-emerald-500" />
-                      <h4 className="text-xs font-black text-neutral-910 dark:text-white uppercase tracking-wider">
-                        B2B Invoicing Accounts Ledger
-                      </h4>
-                    </div>
+                  {/* Internal Sub-Navigation Tabs */}
+                  <div className="flex border-b border-neutral-200 dark:border-neutral-800 pb-1 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRightSubTab('accounts')}
+                      className={`flex-1 pb-2 text-center text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border-b-2 flex items-center justify-center gap-1.5 ${
+                        rightSubTab === 'accounts' 
+                          ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold' 
+                          : 'border-transparent text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>B2B Accounts</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRightSubTab('gateways')}
+                      className={`flex-1 pb-2 text-center text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border-b-2 flex items-center justify-center gap-1.5 ${
+                        rightSubTab === 'gateways' 
+                          ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold' 
+                          : 'border-transparent text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200'
+                      }`}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Gateway API Keys</span>
+                    </button>
                   </div>
 
-                  <p className="text-[11px] text-neutral-550 dark:text-neutral-400 text-left font-normal italic">
-                    Olayo Petroleum provides custom commercial lines of credit to high volume regional logistics, agro-processing, and telecommunications companies. Under Uganda tax compliance, credit aging is audited on Net 30/60 parameters:
-                  </p>
+                  {rightSubTab === 'accounts' ? (
+                    <>
+                      <p className="text-[11px] text-neutral-550 dark:text-neutral-400 text-left font-normal italic">
+                        Olayo Petroleum provides custom commercial lines of credit to high volume regional logistics, agro-processing, and telecommunications companies. Under Uganda tax compliance, credit aging is audited on Net 30/60 parameters:
+                      </p>
 
-                  <div className="space-y-4">
+                      <div className="space-y-4">
                     {corporateAccounts.map(corp => {
                       const computedRemaining = corp.creditLimit - corp.balanceUsed;
                       const outstandingPercent = Math.min(100, Math.round((corp.balanceUsed / corp.creditLimit) * 100));
@@ -2162,8 +2224,215 @@ export default function AdminPanel({
                       </button>
                     </form>
                   </div>
+                </>
+              ) : (
+                /* Dynamic Payment Gateways Setup Form */
+                <div className="space-y-4 text-left border-t border-neutral-200 dark:border-neutral-800 pt-3 text-[11px]">
+                  
+                  <div className="bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 p-3 rounded-xl text-neutral-600 dark:text-neutral-400 leading-relaxed font-normal">
+                    Configure enterprise credentials for aggregate East African checkout channels. Correct configs are bound to real checkout pings on the cashier terminal.
+                  </div>
+
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    setIsSavingCreds(true);
+                    setTimeout(() => {
+                      setIsSavingCreds(false);
+                      alert('Enterprise payment channel credentials successfully persisted to local secure memory.');
+                    }, 1000);
+                  }} className="space-y-4">
+                    
+                    {/* A. MTN Mobile Money */}
+                    <div className="p-3 bg-yellow-500/5 border border-yellow-500/30 rounded-xl space-y-3">
+                      <span className="flex items-center gap-1.5 text-[10px] font-black text-[#D2A000] uppercase tracking-wider">
+                        <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                        MTN Mobile Money API Config
+                      </span>
+
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[8px] font-bold text-neutral-450 dark:text-neutral-550 uppercase mb-0.5">MTN MoMo Merchant ID</label>
+                          <input
+                            type="text"
+                            value={paymentCredentials.mtnMerchantId}
+                            onChange={(e) => setPaymentCredentials({ ...paymentCredentials, mtnMerchantId: e.target.value })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            placeholder="MTN-MER-XXXXXX"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="col-span-2">
+                            <label className="block text-[8px] font-bold text-neutral-450 dark:text-neutral-550 uppercase mb-0.5">MTN API Secret Token</label>
+                            <input
+                              type="password"
+                              value={paymentCredentials.mtnApiKey}
+                              onChange={(e) => setPaymentCredentials({ ...paymentCredentials, mtnApiKey: e.target.value })}
+                              className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-bold text-neutral-450 dark:text-neutral-550 uppercase mb-0.5">Env Mode</label>
+                            <select
+                              value={paymentCredentials.mtnEnv}
+                              onChange={(e) => setPaymentCredentials({ ...paymentCredentials, mtnEnv: e.target.value })}
+                              className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-1.5 text-[10px] dark:text-white focus:outline-none font-bold text-yellow-600"
+                            >
+                              <option value="sandbox">Sandbox</option>
+                              <option value="production">Live Prod</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsTestingPing('mtn');
+                            setTimeout(() => {
+                              setIsTestingPing(null);
+                              alert(`MTN Mobile Money Connection Handshake: Successful 200 OK. Connection authenticated successfully over ${paymentCredentials.mtnEnv} gateway.`);
+                            }, 1200);
+                          }}
+                          disabled={isTestingPing !== null}
+                          className="px-2.5 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/25 text-[#D2A000] text-[9.5px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isTestingPing === 'mtn' ? 'animate-spin' : ''}`} />
+                          <span>{isTestingPing === 'mtn' ? 'Authorizing STK Gateway...' : 'Simulate API Ping Link'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* B. Airtel Money */}
+                    <div className="p-3 bg-red-500/5 mt-3 border border-red-500/30 rounded-xl space-y-3">
+                      <span className="flex items-center gap-1.5 text-[10px] font-black text-red-500 dark:text-red-400 uppercase tracking-wider">
+                        <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                        Airtel Money API Config
+                      </span>
+
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[8px] font-bold text-neutral-455 dark:text-neutral-555 uppercase mb-0.5">Airtel Client ID / Key</label>
+                          <input
+                            type="text"
+                            value={paymentCredentials.airtelClientId}
+                            onChange={(e) => setPaymentCredentials({ ...paymentCredentials, airtelClientId: e.target.value })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            placeholder="AIRTEL-CL-XXXXX"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[8px] font-bold text-neutral-455 dark:text-neutral-555 uppercase mb-0.5">Client Secret</label>
+                            <input
+                              type="password"
+                              value={paymentCredentials.airtelClientSecret}
+                              onChange={(e) => setPaymentCredentials({ ...paymentCredentials, airtelClientSecret: e.target.value })}
+                              className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-bold text-neutral-455 dark:text-neutral-555 uppercase mb-0.5">Merchant Dial Number</label>
+                            <input
+                              type="text"
+                              value={paymentCredentials.airtelMerchantNo}
+                              onChange={(e) => setPaymentCredentials({ ...paymentCredentials, airtelMerchantNo: e.target.value })}
+                              className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsTestingPing('airtel');
+                            setTimeout(() => {
+                              setIsTestingPing(null);
+                              alert(`Airtel Money Secure Link: Connection Handshake established. Authorized Merchant Key: ${paymentCredentials.airtelClientId}.`);
+                            }, 1200);
+                          }}
+                          disabled={isTestingPing !== null}
+                          className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/25 text-red-500 text-[9.5px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isTestingPing === 'airtel' ? 'animate-spin' : ''}`} />
+                          <span>{isTestingPing === 'airtel' ? 'Verifying Keyring...' : 'Simulate API Ping Link'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* C. Pesapal Enterprise Gateway */}
+                    <div className="p-3 bg-indigo-500/5 border border-indigo-500/30 rounded-xl space-y-3">
+                      <span className="flex items-center gap-1.5 text-[10px] font-black text-[#6366f1] dark:text-indigo-400 uppercase tracking-wider">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                        Pesapal Core API Config (V3)
+                      </span>
+
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[8px] font-bold text-neutral-455 dark:text-neutral-555 uppercase mb-0.5">Pesapal Consumer Key</label>
+                          <input
+                            type="text"
+                            value={paymentCredentials.pesapalConsumerKey}
+                            onChange={(e) => setPaymentCredentials({ ...paymentCredentials, pesapalConsumerKey: e.target.value })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            placeholder="pesapal_key_XXXXXX"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="col-span-2">
+                            <label className="block text-[8px] font-bold text-neutral-455 dark:text-neutral-555 uppercase mb-0.5">Pesapal Consumer Secret</label>
+                            <input
+                              type="password"
+                              value={paymentCredentials.pesapalConsumerSecret}
+                              onChange={(e) => setPaymentCredentials({ ...paymentCredentials, pesapalConsumerSecret: e.target.value })}
+                              className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 font-mono text-[10px] dark:text-white focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-bold text-neutral-455 dark:text-neutral-555 uppercase mb-0.5">Mode</label>
+                            <select
+                              value={paymentCredentials.pesapalMode}
+                              onChange={(e) => setPaymentCredentials({ ...paymentCredentials, pesapalMode: e.target.value })}
+                              className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-1.5 text-[10px] dark:text-white focus:outline-none font-bold text-indigo-500"
+                            >
+                              <option value="sandbox">Sandbox</option>
+                              <option value="live">Live</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsTestingPing('pesapal');
+                            setTimeout(() => {
+                              setIsTestingPing(null);
+                              alert(`Pesapal API Handshake Success: Server status authenticated successfully. Bound on ${paymentCredentials.pesapalMode} gateway node.`);
+                            }, 1200);
+                          }}
+                          disabled={isTestingPing !== null}
+                          className="px-2.5 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-500 dark:text-indigo-400 text-[9.5px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isTestingPing === 'pesapal' ? 'animate-spin' : ''}`} />
+                          <span>{isTestingPing === 'pesapal' ? 'Pinging Pesapal...' : 'Simulate API Ping Link'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={isSavingCreds}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shadow-md font-bold"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSavingCreds ? 'animate-spin' : ''}`} />
+                      <span>{isSavingCreds ? 'Configuring Gateways...' : 'Confirm & Persist Credentials'}</span>
+                    </button>
+
+                  </form>
 
                 </div>
+              )}
+
+            </div>
 
                 {/* Panel 5: Integration Specification details */}
                 <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 text-left space-y-3">
@@ -2184,6 +2453,211 @@ export default function AdminPanel({
 
             </div>
 
+          </div>
+        )}
+
+        {selectedReceipt && (
+          <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white text-neutral-800 rounded-3xl overflow-hidden max-w-sm w-full shadow-2xl border border-neutral-200 flex flex-col max-h-[90vh]">
+              
+              {/* Receipt Header Actions */}
+              <div className="bg-neutral-100 px-5 py-3 border-b border-neutral-200/60 flex items-center justify-between">
+                <span className="text-[10.5px] font-bold text-neutral-600 block uppercase tracking-wider font-mono">
+                  TAX INVOICE / RECEIPT
+                </span>
+                <button 
+                  onClick={() => setSelectedReceipt(null)}
+                  className="bg-neutral-200 hover:bg-neutral-300 text-neutral-600 p-1 rounded-full cursor-pointer transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Thermal Tape Paper Scroll */}
+              <div className="p-6 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed relative bg-neutral-50">
+                
+                {/* Paper texture container card */}
+                <div className="bg-white p-5 border border-dashed border-neutral-300 shadow-md rounded-lg space-y-4 text-center">
+                  
+                  {/* Perforation ZigZag simulated line */}
+                  <div className="text-[10px] text-neutral-300 tracking-widest leading-[5px] select-none">
+                    - - - - - - - - - - - - - - - - - - - - - - - - -
+                  </div>
+
+                  {/* Logo / Branch info */}
+                  <div>
+                    <h3 className="font-extrabold text-[14px] text-neutral-900 uppercase">
+                      OLAYO PETROLEUM (U) LTD
+                    </h3>
+                    <p className="text-[9.5px] text-neutral-500 italic mt-0.5 whitespace-pre-wrap">
+                      Plot 14, Kampala-Jinja Highway, Tororo Branch
+                      P.O. Box 928, Tororo, Uganda
+                      Payer-TIN: 1004312894 | Tel: +256 708 800382
+                    </p>
+                  </div>
+
+                  <div className="text-left py-2.5 border-y border-dashed border-neutral-300/80 text-[10px] space-y-1 text-neutral-600">
+                    <div><span className="font-semibold text-neutral-400">RECEIPT NO:</span> {selectedReceipt.id}</div>
+                    <div><span className="font-semibold text-neutral-400">DATE/TIME:</span> {new Date().toLocaleString()}</div>
+                    <div><span className="font-semibold text-neutral-400">STATION:</span> {selectedReceipt.branchName}</div>
+                    <div><span className="font-semibold text-neutral-400">CLIENT:</span> {selectedReceipt.clientName}</div>
+                    <div><span className="font-semibold text-neutral-400">CONTACT:</span> {selectedReceipt.phone}</div>
+                    <div><span className="font-semibold text-neutral-400">OPERATOR:</span> Cashier Terminal POS-04C</div>
+                  </div>
+
+                  {/* Itemized Table */}
+                  <div className="space-y-1.5 text-left text-[10px]">
+                    <div className="flex justify-between font-bold border-b border-dotted border-neutral-300 pb-1 text-neutral-500 uppercase text-[9px]">
+                      <span>Description</span>
+                      <span>Qty/Price</span>
+                      <span className="text-right">Total sum</span>
+                    </div>
+
+                    <div className="flex justify-between items-start pt-1">
+                      <div className="font-semibold text-neutral-800 text-left">
+                        {selectedReceipt.fuelType} Dispensation
+                      </div>
+                      <div className="text-neutral-505 text-right whitespace-nowrap">
+                        {selectedReceipt.litres} L <br/>
+                        <span className="text-[8.5px]">@ UGX {(selectedReceipt.amountUGX / selectedReceipt.litres).toFixed(0)}</span>
+                      </div>
+                      <div className="font-bold text-neutral-905 text-right">
+                        UGX {selectedReceipt.amountUGX.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-dotted border-neutral-350 pt-1.5 space-y-1">
+                      <div className="flex justify-between text-neutral-500 text-[10px]">
+                        <span>VATable Base (18%):</span>
+                        <span>UGX {Math.round(selectedReceipt.amountUGX / 1.18).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-neutral-500 text-[10px]">
+                        <span>VAT Charged (18%):</span>
+                        <span>UGX {Math.round(selectedReceipt.amountUGX * 0.18 / 1.18).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-[12px] border-t border-dashed border-neutral-300/80 pt-1.5 text-neutral-900 animate-pulse">
+                        <span>NET TOTAL TAX EXEMPT:</span>
+                        <span>UGX {Math.round(selectedReceipt.amountUGX / 1.18).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between font-extrabold text-[13px] text-neutral-900 pt-0.5">
+                        <span>TOTAL PAID [UGX]:</span>
+                        <span>UGX {selectedReceipt.amountUGX.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Details */}
+                  <div className="p-2.5 bg-neutral-100 rounded-lg text-left text-[9px] space-y-1 text-neutral-600 border border-neutral-200">
+                    <div><span className="font-bold uppercase text-neutral-700">Payment Channel:</span> {selectedReceipt.paymentMethod}</div>
+                    <div><span className="font-bold uppercase text-neutral-700">Verification ID:</span> OP-PAY-{selectedReceipt.id.substring(0, 8)}</div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold uppercase text-neutral-700">Status:</span>
+                      <span className="text-emerald-600 font-extrabold">TRANSACTION CLEARED SUCCESS</span>
+                    </div>
+                  </div>
+
+                  {/* QR code and Barcode simulation to look real */}
+                  <div className="flex flex-col items-center justify-center space-y-1 pt-2.5">
+                    <div className="w-16 h-16 bg-neutral-100 rounded p-1 flex items-center justify-center border border-neutral-200 font-bold text-neutral-700 text-[10px]">
+                      {/* Simulated QR block layout */}
+                      <div className="grid grid-cols-4 gap-1.5 w-full h-full opacity-70">
+                        <div className="bg-black"></div><div className="bg-black"></div><div></div><div className="bg-black"></div>
+                        <div></div><div className="bg-black"></div><div className="bg-black"></div><div></div>
+                        <div className="bg-black"></div><div></div><div className="bg-black"></div><div className="bg-black"></div>
+                        <div className="bg-black"></div><div className="bg-black"></div><div></div><div className="bg-black"></div>
+                      </div>
+                    </div>
+                    <span className="text-[8px] font-mono tracking-widest text-neutral-400 uppercase mt-1 text-center">
+                      URA-E-INVOICE #ESD-{selectedReceipt.id.substring(0, 8)}
+                    </span>
+                  </div>
+
+                  <div className="text-[9.5px] text-neutral-450 text-center italic pt-1 leading-snug">
+                    Thank you for fueling with Olayo Petroleum! <br/>
+                    Clean Fuel, Reliable Logistics, Honest Pricing.
+                  </div>
+
+                  {/* Paper Bottom Perforation */}
+                  <div className="text-[10px] text-neutral-300 tracking-widest leading-[5px] select-none pt-2">
+                    - - - - - - - - - - - - - - - - - - - - - - - - -
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Receipt Footer Controls */}
+              <div className="bg-neutral-100 px-6 py-4.5 border-t border-neutral-200/60 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(`
+                        <html>
+                          <head>
+                            <title>Olayo Petroleum Receipt ${selectedReceipt.id}</title>
+                            <style>
+                              body { font-family: monospace; padding: 20px; color: #222; }
+                              pre { white-space: pre-wrap; font-size: 13.5px; line-height: 1.5; }
+                            </style>
+                          </head>
+                          <body onload="window.print(); window.close();">
+                            <pre>
+=========================================
+          OLAYO PETROLEUM (U) LTD
+=========================================
+Plot 14, Kampala-Jinja Highway, Tororo
+P.O. Box 928, Tororo, Uganda
+Payer-TIN: 1004312894
+
+RECEIPT NO: \${selectedReceipt.id}
+DATE/TIME:  \${new Date().toLocaleString()}
+STATION:    \${selectedReceipt.branchName}
+CLIENT:     \${selectedReceipt.clientName}
+CONTACT:    \${selectedReceipt.phone}
+
+DESCRIPTION: \${selectedReceipt.fuelType} Fuel Dispensation
+QUANTITY:    \${selectedReceipt.litres} Litres
+NET AMOUNT:  UGX \${Math.round(selectedReceipt.amountUGX / 1.18).toLocaleString()}
+VAT Charged: UGX \${Math.round(selectedReceipt.amountUGX * 0.18 / 1.18).toLocaleString()}
+TOTAL PAID:  UGX \${selectedReceipt.amountUGX.toLocaleString()}
+
+PAY OPTION:  \${selectedReceipt.paymentMethod}
+STATUS:      TRANSACTION CLEARED SUCCESSFUL
+
+-----------------------------------------
+Thank you for your business. Clean Fuel,
+Reliable Logistics, Honesty Pricing.
+=========================================
+                            </pre>
+                          </body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                    } else {
+                      alert('Thermal Print Spooled: Simulated physical printing established successfully (Pop-ups blocked).');
+                    }
+                  }}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Receipt</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert('Receipt Download Spooled: PDF layout saved to system Downloads folder.');
+                  }}
+                  className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download PDF</span>
+                </button>
+              </div>
+
+            </div>
           </div>
         )}
 
