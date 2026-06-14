@@ -1,0 +1,6 @@
+{
+  "name": "Olayo Petroleum",
+  "description": "Professional mobile-first corporate website for Olayo Petroleum located at Mile One, Limbo Street, Tororo, Uganda. High-accuracy forecourt fuel retailing, regional logistics hauling, expert vehicle service diagnostics, and 24-hour convenience store operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

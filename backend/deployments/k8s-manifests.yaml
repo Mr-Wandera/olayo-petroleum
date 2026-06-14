@@ -1,0 +1,289 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: olayopetroleum-prod
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: olayopetroleum-config
+  namespace: olayopetroleum-prod
+data:
+  DB_HOST: "olayopetroleum-db-service"
+  DB_PORT: "5432"
+  DB_NAME: "olayo_petroleum"
+  REDIS_HOST: "olayopetroleum-redis-service"
+  REDIS_PORT: "6379"
+  GIN_MODE: "release"
+  ENV: "production"
+  PORT: "3000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: olayopetroleum-secret
+  namespace: olayopetroleum-prod
+type: Opaque
+data:
+  # Base64 representations of passwords and tokens
+  DB_USER: cG9zdGdyZXM= # 'postgres'
+  DB_PASSWORD: b2xheW9fc2VjcmV0X3BncGFzc3dvcmRfMjAyNg== # 'olayo_secret_pgpassword_2026'
+  REDIS_PASSWORD: T2xheW9UZWxlbWV0cnlQYXNz # 'OlayoTelemetryPass'
+  JWT_SECRET: OWZhOHNkZ2tqaDMwcThnZGFzamtoYXNkOHU5MQ== # '9fa8sdgkjh30q87gdasjkhasd8u91'
+---
+# ==========================================
+# CENTRAL POSTGRESQL STATEFULSET (DURABLE)
+# ==========================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: olayopetroleum-db
+  namespace: olayopetroleum-prod
+spec:
+  serviceName: "olayopetroleum-db-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: olayopetroleum-db
+  template:
+    metadata:
+      labels:
+        app: olayopetroleum-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: dbport
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: olayopetroleum-config
+              key: DB_NAME
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: DB_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: DB_PASSWORD
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+          requests:
+            cpu: "500m"
+            memory: 1Gi
+        volumeMounts:
+        - name: db-vol
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: db-vol
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: olayopetroleum-db-service
+  namespace: olayopetroleum-prod
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: olayopetroleum-db
+---
+# ==========================================
+# REDIS DISTRIBUTED SPEED CACHE
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: olayopetroleum-redis
+  namespace: olayopetroleum-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: olayopetroleum-redis
+  template:
+    metadata:
+      labels:
+        app: olayopetroleum-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        command: ["redis-server", "--appendonly", "yes", "--requirepass", "$(REDIS_PASS)"]
+        ports:
+        - containerPort: 6379
+          name: redisport
+        env:
+        - name: REDIS_PASS
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: REDIS_PASSWORD
+        resources:
+          limits:
+            cpu: "500m"
+            memory: 1Gi
+          requests:
+            cpu: "200m"
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: olayopetroleum-redis-service
+  namespace: olayopetroleum-prod
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: olayopetroleum-redis
+---
+# ==========================================
+# GO API MICROSERVICES DEPLOYMENT
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: olayopetroleum-api
+  namespace: olayopetroleum-prod
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: olayopetroleum-api
+  template:
+    metadata:
+      labels:
+        app: olayopetroleum-api
+    spec:
+      containers:
+      - name: go-api
+        image: gcr.io/olayopetroleum/backend:v1.0.0
+        ports:
+        - containerPort: 3000
+          name: apiport
+        envFrom:
+        - configMapRef:
+            name: olayopetroleum-config
+        env:
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: DB_PASSWORD
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: REDIS_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: olayopetroleum-secret
+              key: JWT_SECRET
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: "100m"
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: olayopetroleum-api-service
+  namespace: olayopetroleum-prod
+spec:
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: olayopetroleum-api
+  type: ClusterIP
+---
+# ==========================================
+# HORIZONTAL POD AUTOSCALER (HPA)
+# ==========================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: olayopetroleum-api-hpa
+  namespace: olayopetroleum-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: olayopetroleum-api
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+---
+# ==========================================
+# SECURE NGINX INGRESS ROUTER
+# ==========================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: olayopetroleum-ingress
+  namespace: olayopetroleum-prod
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.olayopetroleum.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: olayopetroleum-api-service
+            port:
+              number: 80
