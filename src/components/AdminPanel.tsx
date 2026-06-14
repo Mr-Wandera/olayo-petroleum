@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { FuelPrice, ServiceItem, GalleryItem, Testimonial, ContactInquiry, NewsArticle, Branch } from '../types';
 import { 
   DollarSign, Image, Newspaper, Award, Inbox, Edit3, Trash2, Plus, 
-  Check, X, RefreshCw, Eye, ClipboardCheck, LayoutGrid, Fuel, Clock, MapPin
+  Check, X, RefreshCw, Eye, ClipboardCheck, LayoutGrid, Fuel, Clock, MapPin,
+  CreditCard, ShieldAlert, Wifi, WifiOff, Users, ArrowRight, Zap, FileText, Smartphone,
+  TrendingUp, AlertTriangle, ShieldCheck, Activity
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -36,7 +38,150 @@ export default function AdminPanel({
   branches,
   setBranches
 }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'prices' | 'gallery' | 'news' | 'testimonials' | 'inquiries' | 'branches'>('prices');
+  const [activeTab, setActiveTab] = useState<'prices' | 'gallery' | 'news' | 'testimonials' | 'inquiries' | 'branches' | 'payments_erp'>('prices');
+
+  // --- 0. Payments, B2B Accounts & NFC Card State ---
+  const [corporateAccounts, setCorporateAccounts] = useState(() => {
+    const saved = localStorage.getItem('olayo_corporate_accounts');
+    return saved ? JSON.parse(saved) : [
+      { id: 'corp_1', name: 'Mombasa-Kampala Logistics Ltd', creditLimit: 250000000, balanceUsed: 145000000, riskScore: 'Low Risk', activeTags: ['UGX-RF-8923', 'UGX-RF-7432'], phone: '+254798080038' },
+      { id: 'corp_2', name: 'Kigezi Agricultural Haulers Ltd', creditLimit: 120000000, balanceUsed: 118500000, riskScore: 'Critical Risk', activeTags: ['UGX-RF-9011'], phone: '+256701474562' },
+      { id: 'corp_3', name: 'Airtel Uganda Telecom Telecoms', creditLimit: 85000000, balanceUsed: 22000000, riskScore: 'Low Risk', activeTags: ['UGX-RF-3344', 'UGX-RF-1212'], phone: '+256702112233' },
+      { id: 'corp_4', name: 'Save the Children NGO Network', creditLimit: 60000000, balanceUsed: 14200000, riskScore: 'Low Risk', activeTags: ['UGX-RF-1049'], phone: '+256703554433' }
+    ];
+  });
+
+  const [paymentsTransactions, setPaymentsTransactions] = useState(() => {
+    const saved = localStorage.getItem('olayo_transactions');
+    return saved ? JSON.parse(saved) : [
+      { id: 'TXN-10923', branchName: 'Tororo Highway Station', clientName: 'Mombasa-Kampala Logistics Ltd', fuelType: 'Bulk Diesel', litres: 1500, amountUGX: 7200000, paymentMethod: 'B2B Fleet Credit', status: 'Success', phone: '+254798080038', createdAt: '2026-06-14 11:20 AM' },
+      { id: 'TXN-10924', branchName: 'Kampala Logistics Depot', clientName: 'Cash Sale', fuelType: 'Premium Petrol', litres: 45, amountUGX: 252000, paymentMethod: 'MTN Mobile Money', status: 'Success', phone: '+256772112233', createdAt: '2026-06-14 11:45 AM' },
+      { id: 'TXN-10925', branchName: 'Malaba Border Gateway', clientName: 'Save the Children NGO Network', fuelType: 'Bulk Diesel', litres: 300, amountUGX: 1440000, paymentMethod: 'B2B Fleet Credit', status: 'Success', phone: '+256703554433', createdAt: '2026-06-14 12:05 PM' },
+      { id: 'TXN-10926', branchName: 'Busia Transit Hub', clientName: 'Cash Sale', fuelType: 'Premium Petrol', litres: 60, amountUGX: 336000, paymentMethod: 'Airtel Money', status: 'Success', phone: '+254798080038', createdAt: '2026-06-14 12:40 PM' }
+    ];
+  });
+
+  const [fleetCards, setFleetCards] = useState(() => {
+    const saved = localStorage.getItem('olayo_cards');
+    return saved ? JSON.parse(saved) : [
+      { cardNumber: 'OLAYO-NFC-7980', clientName: 'Mombasa-Kampala Logistics Ltd', driverName: 'Abdulhaq Wandera', plateNumber: 'KBH 954E / SSD 322', maxLimitUGX: 15000000, currentSpentUGX: 4300000, status: 'Active' },
+      { cardNumber: 'OLAYO-NFC-5620', clientName: 'Kigezi Agricultural Haulers Ltd', driverName: 'Mugenyi Patrick', plateNumber: 'UBA 445L', maxLimitUGX: 8000000, currentSpentUGX: 7900000, status: 'Active' },
+      { cardNumber: 'OLAYO-NFC-3344', clientName: 'Airtel Uganda Telecom Telecoms', driverName: 'Kato James', plateNumber: 'UBC 122F', maxLimitUGX: 5000000, currentSpentUGX: 1200000, status: 'Active' }
+    ];
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('olayo_corporate_accounts', JSON.stringify(corporateAccounts));
+  }, [corporateAccounts]);
+
+  React.useEffect(() => {
+    localStorage.setItem('olayo_transactions', JSON.stringify(paymentsTransactions));
+  }, [paymentsTransactions]);
+
+  React.useEffect(() => {
+    localStorage.setItem('olayo_cards', JSON.stringify(fleetCards));
+  }, [fleetCards]);
+
+  // Terminal & Simulator states
+  const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [offlineQueue, setOfflineQueue] = useState<any[]>([]);
+  const [simulatedTerminalStep, setSimulatedTerminalStep] = useState<'idle' | 'push_sent' | 'processing' | 'received' | 'success' | 'failed'>('idle');
+  const [terminalProgress, setTerminalProgress] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // New billing states
+  const [posPayload, setPosPayload] = useState({
+    branchId: branches[0]?.id || 'branch_1',
+    clientType: 'cash' as 'cash' | 'corporate',
+    corporateId: 'corp_1',
+    fuelType: 'Bulk Diesel',
+    litres: '100',
+    paymentMethod: 'momo_mtn' as 'momo_mtn' | 'momo_airtel' | 'rfid_tag' | 'bank_eft',
+    phone: '254798080038'
+  });
+
+  const [customCard, setCustomCard] = useState({
+    cardNumber: '',
+    clientName: 'Mombasa-Kampala Logistics Ltd',
+    driverName: '',
+    plateNumber: '',
+    maxLimitUGX: '5000000'
+  });
+
+  const [customCorp, setCustomCorp] = useState({
+    name: '',
+    creditLimit: '100000000',
+    riskScore: 'Low Risk',
+    phone: ''
+  });
+
+  const handleSyncOfflineData = () => {
+    if (offlineQueue.length === 0) return;
+    setIsSyncing(true);
+    setTimeout(() => {
+      setPaymentsTransactions((prev: any[]) => prev.map(t => {
+        if (t.status === 'Captured Offline') {
+          return { ...t, status: 'Success' };
+        }
+        return t;
+      }));
+      setOfflineQueue([]);
+      setIsSyncing(false);
+      alert('Offline local queue synchronized with central database successfully.');
+    }, 1500);
+  };
+
+  const handleRegisterCard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customCard.cardNumber || !customCard.driverName || !customCard.plateNumber) {
+      alert('Please complete all card details');
+      return;
+    }
+    const newCardObj = {
+      cardNumber: `OLAYO-NFC-${customCard.cardNumber.toUpperCase()}`,
+      clientName: customCard.clientName,
+      driverName: customCard.driverName,
+      plateNumber: customCard.plateNumber,
+      maxLimitUGX: parseInt(customCard.maxLimitUGX) || 5000000,
+      currentSpentUGX: 0,
+      status: 'Active'
+    };
+    setFleetCards([...fleetCards, newCardObj]);
+    setCustomCard({
+      cardNumber: '',
+      clientName: 'Mombasa-Kampala Logistics Ltd',
+      driverName: '',
+      plateNumber: '',
+      maxLimitUGX: '5000000'
+    });
+    alert('NFC Fleet Fuel Card registered successfully!');
+  };
+
+  const handleAddCorporate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customCorp.name || !customCorp.phone) {
+      alert('Please fill out all required corporate details');
+      return;
+    }
+    const newCorp = {
+      id: `corp_${Date.now()}`,
+      name: customCorp.name,
+      creditLimit: parseInt(customCorp.creditLimit) || 100000000,
+      balanceUsed: 0,
+      riskScore: customCorp.riskScore,
+      activeTags: [`UGX-RF-${Math.floor(1000 + Math.random() * 9000)}`],
+      phone: customCorp.phone
+    };
+    setCorporateAccounts([...corporateAccounts, newCorp]);
+    setCustomCorp({
+      name: '',
+      creditLimit: '100000000',
+      riskScore: 'Low Risk',
+      phone: ''
+    });
+    alert('New commercial B2B credit terms authorized successfully!');
+  };
 
   // --- 1. Price Management Sub-states ---
   const handlePriceChange = (id: string, field: keyof FuelPrice, value: any) => {
@@ -370,6 +515,23 @@ export default function AdminPanel({
           >
             <MapPin className="w-4 h-4" />
             <span>Manage Branches</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('payments_erp')}
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'payments_erp'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-55 dark:hover:bg-neutral-950'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 text-emerald-400" />
+            <span className="flex items-center gap-1">
+              <span>Billing & Cashless ERP</span>
+              {offlineQueue.length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              )}
+            </span>
           </button>
 
         </div>
@@ -1144,6 +1306,880 @@ export default function AdminPanel({
                     ))}
                   </div>
                 )}
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {activeTab === 'payments_erp' && (
+          <div className="space-y-8 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-3xl p-6 sm:p-8 shadow-sm">
+            
+            {/* 1. Header segment */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-200 dark:border-neutral-850 pb-5 gap-4">
+              <div>
+                <h3 className="text-lg font-black text-neutral-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-emerald-500" /> B2B Credit, Fleet RFID & Cashless Operating Hub
+                </h3>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  Orchestrate commercial fleet accounts, issue contactless RFID hardware, verify credit lines, and test high-fidelity mobile payment api hooks.
+                </p>
+              </div>
+
+              {/* State Controls: Offline Sync Trigger */}
+              <div className="flex items-center gap-3 self-start sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setIsOffline(!isOffline)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-all cursor-pointer ${
+                    isOffline 
+                      ? 'bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500/20' 
+                      : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20'
+                  }`}
+                  title="Simulate network outage for East African border terminals"
+                >
+                  {isOffline ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
+                  <span>Datalink: {isOffline ? 'OFFLINE (SQLite Cached)' : 'CONNECTED (Postgres Live)'}</span>
+                </button>
+
+                {offlineQueue.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleSyncOfflineData}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase disabled:opacity-50 transition-all cursor-pointer animate-pulse"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>Sync Queue ({offlineQueue.length})</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Top-level Financial and Operational KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200/60 dark:border-neutral-850 p-4.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">Today\'s Cashless Revenue</span>
+                <span className="text-[20px] font-black text-neutral-900 dark:text-white block mt-1.5">
+                  UGX {paymentsTransactions
+                    .filter(t => t.status === 'Success' || t.status === 'Captured Offline')
+                    .reduce((sum, t) => sum + t.amountUGX, 0)
+                    .toLocaleString()}
+                </span>
+                <div className="flex items-center gap-1 text-[10px] text-green-500 font-bold mt-1">
+                  <TrendingUp className="w-3 h-3" />
+                  <span>Real-time POS Logs</span>
+                </div>
+                <Activity className="absolute right-3.5 bottom-3.5 w-8 h-8 text-neutral-200 dark:text-neutral-900 pointer-events-none" />
+              </div>
+
+              <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200/60 dark:border-neutral-850 p-4.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">Total B2B Credit Exposure</span>
+                <span className="text-[20px] font-black text-orange-600 dark:text-orange-400 block mt-1.5">
+                  UGX {corporateAccounts.reduce((sum, c) => sum + c.balanceUsed, 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-neutral-450 dark:text-neutral-500 block mt-1">
+                  Outstanding on Net 30/60 terms
+                </span>
+                <FileText className="absolute right-3.5 bottom-3.5 w-8 h-8 text-neutral-200 dark:text-neutral-900 pointer-events-none" />
+              </div>
+
+              <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200/60 dark:border-neutral-850 p-4.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">Active RFID Windshields</span>
+                <span className="text-[20px] font-black text-neutral-900 dark:text-white block mt-1.5">
+                  {corporateAccounts.reduce((sum, c) => sum + c.activeTags.length, 0)} Units
+                </span>
+                <span className="text-[10px] text-emerald-500 font-bold block mt-1">
+                  Verified high frequency transponders
+                </span>
+                <Zap className="absolute right-3.5 bottom-3.5 w-8 h-8 text-neutral-200 dark:text-neutral-900 pointer-events-none" />
+              </div>
+
+              <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200/60 dark:border-neutral-850 p-4.5 rounded-2xl relative overflow-hidden">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">Telemetry Sync Signal</span>
+                <span className={`text-[19px] font-black block mt-1.5 uppercase ${isOffline ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  {isOffline ? 'SQLite Queue Only' : 'Postgres Streaming'}
+                </span>
+                <span className="text-[10px] text-neutral-450 dark:text-neutral-500 block mt-1">
+                  {isOffline ? 'Transactions buffered in RAM outbox' : 'Zero logs variance detected'}
+                </span>
+                <Wifi className="absolute right-3.5 bottom-3.5 w-8 h-8 text-neutral-200 dark:text-neutral-900 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 3. Main Split-Workspace Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* LEFT SPLIT (8 Columns): Billing simulator panels & Transactions list */}
+              <div className="lg:col-span-7 space-y-8">
+                
+                {/* Panel 1: Interactive Point of Sale Checkout Simulator */}
+                <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 space-y-5">
+                  <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-5 h-5 text-emerald-500" />
+                      <h4 className="text-xs font-black text-neutral-905 dark:text-white uppercase tracking-wider">
+                        Interactive Cashier & POS Sales Desk
+                      </h4>
+                    </div>
+                    <span className="text-[9px] font-mono bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-bold px-2 py-0.5 rounded">
+                      Terminal V2.4-Active
+                    </span>
+                  </div>
+
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    setErrorMessage('');
+                    
+                    const selectedBranch = branches.find(b => b.id === posPayload.branchId) || { name: 'Direct Gateway HQ' };
+                    let clientNameVal = 'Cash Customer';
+                    let phoneVal = posPayload.phone;
+                    
+                    if (posPayload.clientType === 'corporate') {
+                      const corpItem = corporateAccounts.find(c => c.id === posPayload.corporateId);
+                      if (!corpItem) {
+                        setErrorMessage('Verify B2B Corporate Partner selection');
+                        return;
+                      }
+                      clientNameVal = corpItem.name;
+                      phoneVal = corpItem.phone;
+                    }
+                    
+                    const numericLitres = parseFloat(posPayload.litres) || 0;
+                    if (numericLitres <= 0) {
+                      setErrorMessage('Please enter a valid fuel volume');
+                      return;
+                    }
+                    
+                    let unitPrice = 4800; // default diesel
+                    if (posPayload.fuelType === 'Premium Petrol') unitPrice = 5600;
+                    else if (posPayload.fuelType === 'Lubricants') unitPrice = 12000;
+                    
+                    const totalAmount = Math.round(numericLitres * unitPrice);
+
+                    // If OFFLINE, append to offline sync cache
+                    if (isOffline) {
+                      const newTxn = {
+                        id: `OFFLINE-TXN-${Date.now()}`,
+                        branchName: selectedBranch.name,
+                        clientName: clientNameVal,
+                        fuelType: posPayload.fuelType,
+                        litres: numericLitres,
+                        amountUGX: totalAmount,
+                        paymentMethod: posPayload.paymentMethod === 'momo_mtn' ? 'MTN Mobile Money' :
+                                       posPayload.paymentMethod === 'momo_airtel' ? 'Airtel Money' :
+                                       posPayload.paymentMethod === 'rfid_tag' ? 'B2B Fleet Credit' : 'EFT Bank Settlement',
+                        status: 'Captured Offline',
+                        phone: phoneVal,
+                        createdAt: new Date().toLocaleDateString('en-US') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                      };
+                      
+                      setOfflineQueue(prev => [...prev, newTxn]);
+                      setPaymentsTransactions(prev => [newTxn, ...prev]);
+                      return;
+                    }
+
+                    // If ONLINE, run high-fidelity interactive simulation
+                    setSimulatedTerminalStep('push_sent');
+                    setTerminalProgress(20);
+                    
+                    const t1 = setTimeout(() => {
+                      setSimulatedTerminalStep('processing');
+                      setTerminalProgress(55);
+                    }, 1200);
+
+                    const t2 = setTimeout(() => {
+                      if (posPayload.paymentMethod === 'rfid_tag' || posPayload.clientType === 'corporate') {
+                        const corpItem = corporateAccounts.find(c => c.id === posPayload.corporateId);
+                        if (corpItem) {
+                          const remainingLimit = corpItem.creditLimit - corpItem.balanceUsed;
+                          if (remainingLimit < totalAmount) {
+                            setSimulatedTerminalStep('failed');
+                            setTerminalProgress(100);
+                            setErrorMessage(`Payment Rejected: B2B limit exceeded by UGX ${(totalAmount - remainingLimit).toLocaleString()}`);
+                            return;
+                          }
+                          
+                          setCorporateAccounts(prev => prev.map(c => {
+                            if (c.id === corpItem.id) {
+                              return { ...c, balanceUsed: c.balanceUsed + totalAmount };
+                            }
+                            return c;
+                          }));
+                        }
+                      }
+                      setSimulatedTerminalStep('received');
+                      setTerminalProgress(85);
+                    }, 2400);
+
+                    const t3 = setTimeout(() => {
+                      const cleanId = `TXN-${Math.floor(11000 + Math.random() * 88000)}`;
+                      const newTxn = {
+                        id: cleanId,
+                        branchName: selectedBranch.name,
+                        clientName: clientNameVal,
+                        fuelType: posPayload.fuelType,
+                        litres: numericLitres,
+                        amountUGX: totalAmount,
+                        paymentMethod: posPayload.paymentMethod === 'momo_mtn' ? 'MTN Mobile Money' :
+                                       posPayload.paymentMethod === 'momo_airtel' ? 'Airtel Money' :
+                                       posPayload.paymentMethod === 'rfid_tag' ? 'B2B Fleet Credit' : 'EFT Bank Settlement',
+                        status: 'Success',
+                        phone: phoneVal,
+                        createdAt: new Date().toLocaleDateString('en-US') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                      };
+                      
+                      setPaymentsTransactions(prev => [newTxn, ...prev]);
+                      setSimulatedTerminalStep('success');
+                      setTerminalProgress(100);
+                    }, 3600);
+                  }} className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-left">
+                    
+                    {/* Left fields side */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Dispatch Branch *</label>
+                        <select
+                          value={posPayload.branchId}
+                          onChange={(e) => setPosPayload({ ...posPayload, branchId: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-2 px-3 text-xs dark:text-white font-medium focus:outline-none"
+                        >
+                          {branches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Customer Filter</label>
+                          <select
+                            value={posPayload.clientType}
+                            onChange={(e) => setPosPayload({ ...posPayload, clientType: e.target.value as 'cash' | 'corporate' })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-1.5 px-3.5 text-xs dark:text-white focus:outline-none"
+                          >
+                            <option value="cash">Retail (Walk-in)</option>
+                            <option value="corporate">B2B Corporate</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Fuel Product</label>
+                          <select
+                            value={posPayload.fuelType}
+                            onChange={(e) => setPosPayload({ ...posPayload, fuelType: e.target.value })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-1.5 px-3 text-xs dark:text-white focus:outline-none"
+                          >
+                            <option value="Bulk Diesel">Bulk Diesel (Default)</option>
+                            <option value="Premium Petrol">Premium Petrol</option>
+                            <option value="Lubricants">High Lube Oils</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {posPayload.clientType === 'corporate' && (
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Enterprise Client Account</label>
+                          <select
+                            value={posPayload.corporateId}
+                            onChange={(e) => {
+                              const chosen = corporateAccounts.find(c => c.id === e.target.value);
+                              setPosPayload({ 
+                                ...posPayload, 
+                                corporateId: e.target.value,
+                                phone: chosen ? chosen.phone.replace(/[^0-9]/g, '') : posPayload.phone
+                              });
+                            }}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-2 px-3 text-xs dark:text-white focus:outline-none font-bold text-emerald-600 dark:text-emerald-400"
+                          >
+                            {corporateAccounts.map(c => (
+                              <option key={c.id} value={c.id}>{c.name} (Limit: UGX {(c.creditLimit - c.balanceUsed).toLocaleString()} Free)</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Fuel Volume (Litres) *</label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          value={posPayload.litres}
+                          onChange={(e) => setPosPayload({ ...posPayload, litres: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-2 px-3 text-xs dark:text-white focus:outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right fields side */}
+                    <div className="space-y-4">
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Transaction Payment Gateway Method</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPosPayload({ ...posPayload, paymentMethod: 'momo_mtn' })}
+                            className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                              posPayload.paymentMethod === 'momo_mtn' 
+                                ? 'bg-[#FFCC00]/10 border-[#FFCC00] text-[#D2A000] font-black' 
+                                : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500'
+                            }`}
+                          >
+                            <Smartphone className="w-4 h-4 mx-auto mb-1 text-yellow-600" />
+                            <span className="text-[10px] block font-mono">MTN MoMo</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setPosPayload({ ...posPayload, paymentMethod: 'momo_airtel' })}
+                            className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                              posPayload.paymentMethod === 'momo_airtel' 
+                                ? 'bg-red-500/10 border-red-500 text-red-500 font-black' 
+                                : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500'
+                            }`}
+                          >
+                            <Smartphone className="w-4 h-4 mx-auto mb-1 text-red-500" />
+                            <span className="text-[10px] block font-mono">Airtel Money</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setPosPayload({ ...posPayload, paymentMethod: 'rfid_tag' })}
+                            className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                              posPayload.paymentMethod === 'rfid_tag' 
+                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-450 font-black' 
+                                : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500'
+                            }`}
+                          >
+                            <Zap className="w-4 h-4 mx-auto mb-1 text-emerald-500" />
+                            <span className="text-[10px] block font-mono">RFID Auto-Tag</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setPosPayload({ ...posPayload, paymentMethod: 'bank_eft' })}
+                            className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                              posPayload.paymentMethod === 'bank_eft' 
+                                ? 'bg-blue-500/10 border-blue-500 text-blue-500 font-black' 
+                                : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-500'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                            <span className="text-[10px] block font-mono">EFT Settlement</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-400 mb-1 uppercase">Subscriber Dial Number / B2B Ref</label>
+                        <input
+                          type="text"
+                          required
+                          value={posPayload.phone}
+                          onChange={(e) => setPosPayload({ ...posPayload, phone: e.target.value })}
+                          placeholder="e.g. 254798080038"
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-2 px-3 text-xs dark:text-white font-mono focus:outline-none"
+                        />
+                        <span className="text-[9px] text-neutral-450 mt-1 block">Prefills with developer direct or client phone records</span>
+                      </div>
+
+                      {/* Display pricing metrics live */}
+                      <div className="bg-neutral-100 dark:bg-neutral-900 rounded-xl p-3 border border-neutral-200/50 dark:border-neutral-800 flex justify-between items-center">
+                        <div>
+                          <span className="text-[9px] font-bold text-neutral-400 block uppercase font-mono">Gross Amount Due</span>
+                          <span className="text-sm font-black text-neutral-900 dark:text-white mt-0.5">
+                            UGX {Math.round((parseFloat(posPayload.litres) || 0) * (posPayload.fuelType === 'Premium Petrol' ? 5600 : posPayload.fuelType === 'Lubricants' ? 12000 : 4800)).toLocaleString()}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-neutral-450 dark:text-neutral-500 italic">
+                          ({posPayload.fuelType === 'Premium Petrol' ? 'UGX 5,600' : posPayload.fuelType === 'Lubricants' ? 'UGX 12,000' : 'UGX 4,800'} per L)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Footer error messages inside form */}
+                    {errorMessage && (
+                      <div className="col-span-1 sm:col-span-2 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-1.5 text-xs text-rose-500 font-bold">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>{errorMessage}</span>
+                      </div>
+                    )}
+
+                    {/* Action trigger dispatch */}
+                    <div className="col-span-1 sm:col-span-2">
+                      <button
+                        type="submit"
+                        disabled={simulatedTerminalStep !== 'idle' && simulatedTerminalStep !== 'success' && simulatedTerminalStep !== 'failed'}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${simulatedTerminalStep !== 'idle' && simulatedTerminalStep !== 'success' && simulatedTerminalStep !== 'failed' ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isOffline 
+                            ? 'Capture Offline Offline (Queue Log)' 
+                            : simulatedTerminalStep === 'push_sent' ? 'Sending API STK Notification...'
+                            : simulatedTerminalStep === 'processing' ? 'Awaiting Subscriber PIN on Mobile Card...'
+                            : simulatedTerminalStep === 'received' ? 'Received Secret Callback Approval...'
+                            : 'Process POS payment checkout'}
+                        </span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Simulator Screen Visual Overlay */}
+                  {simulatedTerminalStep !== 'idle' && (
+                    <div className="mt-4 p-4 rounded-xl border text-center transition-all space-y-3 bg-[#0A0D14] text-neutral-300 border-neutral-800">
+                      <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                        <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase">Interactive Terminal Handshake Logs</span>
+                        <button 
+                          onClick={() => setSimulatedTerminalStep('idle')} 
+                          className="text-[10px] text-rose-500 hover:underline uppercase font-bold cursor-pointer"
+                        >
+                          Clear Simulator Screen
+                        </button>
+                      </div>
+
+                      {/* Display live progress visualizer */}
+                      <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-emerald-500 transition-all duration-300"
+                          style={{ width: `${terminalProgress}%` }}
+                        />
+                      </div>
+
+                      <div className="text-left font-mono text-[10.5px] space-y-1 text-neutral-450 leading-relaxed">
+                        <p className="flex justify-between">
+                          <span>[PE-API] Endpoint Initialization:</span>
+                          <span className="text-emerald-400">SUCCESS</span>
+                        </p>
+                        {terminalProgress >= 10 && (
+                          <p className="flex justify-between">
+                            <span>[PE-API] Payload:</span>
+                            <span className="text-yellow-400">STK PUSH to +{posPayload.phone} (UGX {Math.round((parseFloat(posPayload.litres) || 0) * (posPayload.fuelType === 'Premium Petrol' ? 5600 : posPayload.fuelType === 'Lubricants' ? 12000 : 4800)).toLocaleString()})</span>
+                          </p>
+                        )}
+                        {terminalProgress >= 40 && (
+                          <p className="flex justify-between">
+                            <span>[PE-API] Transacting Status:</span>
+                            <span className="text-blue-400 animate-pulse">Awaiting manual remote PIN entry over Cellular Network</span>
+                          </p>
+                        )}
+                        {terminalProgress >= 80 && (
+                          <p className="flex justify-between">
+                            <span>[PE-API] IPSec Router Callback:</span>
+                            <span className="text-emerald-400">Authenticated Signature OK</span>
+                          </p>
+                        )}
+                        {terminalProgress === 100 && simulatedTerminalStep === 'success' && (
+                          <p className="text-emerald-500 dark:text-emerald-400 font-black text-center pt-2 uppercase tracking-wide text-xs flex items-center justify-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <span>Payment Completed! Central database ledger accounts updated successfully.</span>
+                          </p>
+                        )}
+                        {terminalProgress === 100 && simulatedTerminalStep === 'failed' && (
+                          <p className="text-rose-500 font-bold text-center pt-2 uppercase tracking-wide text-xs">
+                             ❌ Transaction Cancelled / Denied: {errorMessage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Panel 2: Live Ledger of Cashless/B2B Payments Transactions */}
+                <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-indigo-500" />
+                      <h4 className="text-xs font-black text-neutral-900 dark:text-white uppercase tracking-wider">
+                        Live Accounting Transaction Stream (Central DB Mirror)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono text-neutral-450 dark:text-neutral-500 font-bold">
+                      Latest {paymentsTransactions.length} events logged
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] text-left">
+                      <thead>
+                        <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 uppercase tracking-wider text-[9px] font-mono">
+                          <th className="pb-2.5 font-bold">Txn Identity</th>
+                          <th className="pb-2.5 font-bold">Branch / Station</th>
+                          <th className="pb-2.5 font-bold">Client Context</th>
+                          <th className="pb-2.5 font-bold">Litres</th>
+                          <th className="pb-2.5 font-bold text-right">Sum (UGX)</th>
+                          <th className="pb-2.5 font-bold">Method</th>
+                          <th className="pb-2.5 font-bold text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-900 font-medium text-neutral-700 dark:text-neutral-300">
+                        {paymentsTransactions.map(txn => (
+                          <tr key={txn.id} className="hover:bg-neutral-100/50 dark:hover:bg-neutral-900/30 transition-colors">
+                            <td className="py-3 font-mono text-neutral-450 dark:text-neutral-500 text-[10px]">{txn.id}</td>
+                            <td className="py-3 font-semibold">{txn.branchName}</td>
+                            <td className="py-3">
+                              <span className="block font-semibold text-neutral-900 dark:text-white">{txn.clientName}</span>
+                              <span className="text-[9px] text-neutral-450 font-mono italic">{txn.phone}</span>
+                            </td>
+                            <td className="py-3">{txn.litres} L <span className="text-[9px] text-neutral-500">[{txn.fuelType}]</span></td>
+                            <td className="py-3 text-right font-black text-neutral-900 dark:text-white">UGX {txn.amountUGX.toLocaleString()}</td>
+                            <td className="py-2">
+                              <span className="font-mono text-[9px] bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded border border-neutral-200/50 dark:border-neutral-805">
+                                {txn.paymentMethod}
+                              </span>
+                            </td>
+                            <td className="py-3 text-center">
+                              {txn.status === 'Success' ? (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 capitalize">
+                                  Live Synced 🟢
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-450 uppercase animate-pulse">
+                                  Offline Queue 🔴
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Panel 3: NFC Fuel Card Simulator and Dispatch Center */}
+                <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 space-y-6">
+                  <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-indigo-500 animate-pulse" />
+                      <h4 className="text-xs font-black text-neutral-905 dark:text-white uppercase tracking-wider">
+                        NFC Fuel Card & Windshield Tag Scanner Workspace
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                    
+                    {/* NFC Virtual Card Graphic */}
+                    <div className="md:col-span-5 bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 p-5 rounded-2xl border border-indigo-500/20 shadow-xl space-y-5 relative overflow-hidden h-48 flex flex-col justify-between text-left">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[9px] font-bold tracking-widest text-[#FFCC00] uppercase block">Olayo Fleet Card</span>
+                          <span className="text-[10px] text-neutral-400 font-mono">B2B Commercial Ledger</span>
+                        </div>
+                        <span className="w-9 h-7 bg-amber-400/20 border border-amber-400/40 rounded-md flex items-center justify-center text-[10px] font-bold text-amber-300">
+                          NFC CHIP
+                        </span>
+                      </div>
+
+                      <div className="relative z-10">
+                        <span className="text-sm font-bold block text-indigo-100 uppercase tracking-wide">
+                          {posPayload.clientType === 'corporate' 
+                            ? corporateAccounts.find(c => c.id === posPayload.corporateId)?.name || 'Mombasa Logistics' 
+                            : 'Mombasa-Kampala Logistics Ltd'}
+                        </span>
+                        <span className="text-xs font-mono text-neutral-350 block mt-1 tracking-widest">
+                          {posPayload.clientType === 'corporate' && corporateAccounts.find(c => c.id === posPayload.corporateId)?.activeTags[0] 
+                            ? `RFID-${corporateAccounts.find(c => c.id === posPayload.corporateId)?.activeTags[0]}`
+                            : 'RFID-UGX-RF-8923'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-end">
+                        <span className="text-[9px] font-mono text-neutral-450 uppercase">Secured by Pesapal EOS</span>
+                        <span className="text-[11px] font-black text-emerald-400 font-mono">UGX APPROVED</span>
+                      </div>
+
+                      {/* Glowing radial pulse behind card */}
+                      <span className="absolute -right-12 -bottom-12 w-28 h-28 rounded-full bg-emerald-500/10 blur-2xl" />
+                    </div>
+
+                    {/* NFC Scanning Tool Form and Action */}
+                    <div className="md:col-span-7 space-y-4 text-left">
+                      <span className="text-[10px] font-bold text-neutral-400 block uppercase tracking-widest font-mono">NFC Fuel Card & Active RFID Tags (Simulate Tap)</span>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed font-normal">
+                        Select a vehicle fleet card from our current registers below, then press &apos;Simulate Physical Tap&apos;. The dispenser nozzle communicates with the server via encrypted MQTT streams before authorizing the forecourt flow.
+                      </p>
+
+                      <div className="space-y-3">
+                        <label className="block text-[9px] font-bold text-neutral-400 uppercase">Select Active Card Device Holder</label>
+                        <select
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg py-1.5 px-3 text-xs dark:text-white focus:outline-none"
+                          onChange={(e) => {
+                            const card = fleetCards.find(c => c.cardNumber === e.target.value);
+                            if (card) {
+                              setPosPayload({
+                                ...posPayload,
+                                clientType: 'corporate',
+                                corporateId: card.clientName.toLowerCase().includes('mombasa') ? 'corp_1' :
+                                             card.clientName.toLowerCase().includes('kigezi') ? 'corp_2' : 'corp_3',
+                                phone: card.cardNumber
+                              });
+                            }
+                          }}
+                        >
+                          {fleetCards.map(c => (
+                            <option key={c.cardNumber} value={c.cardNumber}>
+                              {c.cardNumber} - {c.driverName} ({c.plateNumber})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosPayload({
+                            ...posPayload,
+                            paymentMethod: 'rfid_tag',
+                            clientType: 'corporate'
+                          });
+                          alert('Device mapped on terminal. Simulated contactless tap verified. Push checkout at the top table using standard pricing logic.');
+                        }}
+                        className="py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow cursor-pointer uppercase tracking-wider inline-flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Simulate Physical Card Tap</span>
+                      </button>
+                    </div>
+
+                  </div>
+
+                  {/* Register New Fuel Fleet Cards Form */}
+                  <div className="bg-neutral-100 dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/65 dark:border-neutral-850 mt-4 text-left">
+                    <span className="text-[10px] font-bold text-neutral-500 block uppercase tracking-widest font-mono mb-3">Provision & Assign New NFC Fleet Card</span>
+                    
+                    <form onSubmit={handleRegisterCard} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                      
+                      <div className="sm:col-span-1">
+                        <label className="block text-[8px] font-bold text-neutral-450 mb-1 uppercase">Card Serial *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 5566"
+                          value={customCard.cardNumber}
+                          onChange={(e) => setCustomCard({ ...customCard, cardNumber: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 text-[11px] dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <label className="block text-[8px] font-bold text-neutral-450 mb-1 uppercase">Allocated Driver *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Wandera Abdul"
+                          value={customCard.driverName}
+                          onChange={(e) => setCustomCard({ ...customCard, driverName: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 text-[11px] dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <label className="block text-[8px] font-bold text-neutral-450 mb-1 uppercase">Vehicle License *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. UBA 220B"
+                          value={customCard.plateNumber}
+                          onChange={(e) => setCustomCard({ ...customCard, plateNumber: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 text-[11px] dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <button
+                          type="submit"
+                          className="w-full py-1.5 bg-indigo-600 hover:bg-slate-700 text-white rounded text-[11px] font-black transition-all cursor-pointer uppercase flex items-center justify-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Provision</span>
+                        </button>
+                      </div>
+
+                    </form>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* RIGHT SPLIT (4 Columns): B2B corporate customer list & Limits Tracker */}
+              <div className="lg:col-span-5 space-y-6">
+                
+                {/* Panel 4: Corporate Clients Limits Ledger & Risk Analyzer */}
+                <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 space-y-5">
+                  <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-emerald-500" />
+                      <h4 className="text-xs font-black text-neutral-910 dark:text-white uppercase tracking-wider">
+                        B2B Invoicing Accounts Ledger
+                      </h4>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-neutral-550 dark:text-neutral-400 text-left font-normal italic">
+                    Olayo Petroleum provides custom commercial lines of credit to high volume regional logistics, agro-processing, and telecommunications companies. Under Uganda tax compliance, credit aging is audited on Net 30/60 parameters:
+                  </p>
+
+                  <div className="space-y-4">
+                    {corporateAccounts.map(corp => {
+                      const computedRemaining = corp.creditLimit - corp.balanceUsed;
+                      const outstandingPercent = Math.min(100, Math.round((corp.balanceUsed / corp.creditLimit) * 100));
+                      
+                      return (
+                        <div 
+                          key={corp.id}
+                          className="p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-xl space-y-3 relative text-left"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h5 className="text-[11.5px] font-black text-neutral-900 dark:text-white uppercase leading-tight">
+                                {corp.name}
+                              </h5>
+                              <span className="text-[9px] text-neutral-450 block mt-0.5">
+                                Contacts: {corp.phone}
+                              </span>
+                            </div>
+
+                            {/* Risk badge indicator */}
+                            <span className={`text-[8.5px] font-mono px-2 py-0.5 rounded font-black uppercase tracking-wider ${
+                              corp.riskScore === 'Low Risk' 
+                                ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400'
+                                : 'bg-rose-100 dark:bg-rose-950/40 text-rose-750 dark:text-rose-450 animate-pulse'
+                            }`}>
+                              {corp.riskScore}
+                            </span>
+                          </div>
+
+                          {/* Graphical bar meter */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[10px] text-neutral-500">
+                              <span>Credit Allocation Utilization</span>
+                              <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">{outstandingPercent}% Used</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  outstandingPercent > 85 ? 'bg-rose-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${outstandingPercent}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Detailed financial figures breakdown */}
+                          <div className="grid grid-cols-2 gap-2 text-[10.5px] pt-1 leading-normal font-medium text-neutral-550 dark:text-neutral-450">
+                            <div>
+                              <span className="text-neutral-400 text-[8px] uppercase font-mono block">Line of Credit:</span>
+                              <strong className="text-neutral-700 dark:text-neutral-300">UGX {corp.creditLimit.toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              <span className="text-neutral-400 text-[8px] uppercase font-mono block">Invoiced Debt:</span>
+                              <strong className={`${outstandingPercent > 85 ? 'text-rose-500' : 'text-neutral-700 dark:text-neutral-300'}`}>
+                                UGX {corp.balanceUsed.toLocaleString()}
+                              </strong>
+                            </div>
+                          </div>
+
+                          {/* Active RFID tag transponders */}
+                          <div className="flex flex-wrap items-center gap-1 pt-2 border-t border-neutral-100 dark:border-neutral-800 text-[9px]">
+                            <span className="text-neutral-400 uppercase font-mono">Bound Transponders:</span>
+                            {corp.activeTags.map(tag => (
+                              <span key={tag} className="bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-600 dark:text-neutral-400 font-mono">
+                                RFID-{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Add New Corporate Client Form */}
+                  <div className="bg-neutral-100 dark:bg-neutral-900 rounded-xl p-4.5 border border-neutral-200/60 dark:border-neutral-850 text-left space-y-3">
+                    <span className="text-[10px] font-bold text-neutral-500 block uppercase tracking-widest font-mono">Setup New Commercial Account</span>
+                    
+                    <form onSubmit={handleAddCorporate} className="space-y-3">
+                      <div>
+                        <label className="block text-[8px] font-bold text-neutral-400 uppercase mb-1">Company Legal Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Kenya Cargo Express"
+                          value={customCorp.name}
+                          onChange={(e) => setCustomCorp({ ...customCorp, name: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1.5 px-2.5 text-xs dark:text-white"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[8px] font-bold text-neutral-400 uppercase mb-1">Risk Profile Category</label>
+                          <select
+                            value={customCorp.riskScore}
+                            onChange={(e) => setCustomCorp({ ...customCorp, riskScore: e.target.value })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 text-xs dark:text-white"
+                          >
+                            <option value="Low Risk">Low Risk Standard</option>
+                            <option value="Medium Risk">Medium Risk Audit</option>
+                            <option value="Critical Risk">Critical Exposure Risk</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[8px] font-bold text-neutral-400 uppercase mb-1">Assigned Credit Limit (UGX)</label>
+                          <input
+                            type="number"
+                            required
+                            value={customCorp.creditLimit}
+                            onChange={(e) => setCustomCorp({ ...customCorp, creditLimit: e.target.value })}
+                            className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1 px-2 text-xs dark:text-white font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[8px] font-bold text-neutral-400 uppercase mb-1">Direct Contact Phone *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 254798080038"
+                          value={customCorp.phone}
+                          onChange={(e) => setCustomCorp({ ...customCorp, phone: e.target.value })}
+                          className="w-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded py-1.5 px-2 text-xs dark:text-white"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-2 bg-emerald-600 hover:bg-slate-700 text-white rounded text-xs font-black transition-all cursor-pointer uppercase tracking-wider flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Authorize Commercial Account</span>
+                      </button>
+                    </form>
+                  </div>
+
+                </div>
+
+                {/* Panel 5: Integration Specification details */}
+                <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-850 rounded-2xl p-6 text-left space-y-3">
+                  <h4 className="text-[11px] font-black text-neutral-900 dark:text-white uppercase tracking-wider font-mono">
+                    System Tech Stack Architecture
+                  </h4>
+                  <p className="text-[11px] text-neutral-450 leading-relaxed font-normal">
+                    This cash management layer utilizes concurrent mutex locks inside the Golang Gin core container, storing logs across Redis transactional channels prior to persisting to main PostgreSQL instances.
+                  </p>
+                  <div className="p-3.5 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200/50 dark:border-neutral-800 text-[9.5px] font-mono text-neutral-500 space-y-1 leading-normal">
+                    <p>⚡ SECURE_TOKEN: pesapal_bearer_secret</p>
+                    <p>⚡ MQTT_IP_BROKER: mqtt.olayopetroleum.com:1883</p>
+                    <p>⚡ SQL_TRANSACTIONS_BUFFER: memory_outbox_queue</p>
+                  </div>
+                </div>
+
               </div>
 
             </div>
