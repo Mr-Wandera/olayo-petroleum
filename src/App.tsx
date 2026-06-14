@@ -12,6 +12,7 @@ import Testimonials from './components/Testimonials';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import AdminPanel from './components/AdminPanel';
+import AdminLogin from './components/AdminLogin';
 import DeveloperHub from './components/DeveloperHub';
 
 import { 
@@ -67,9 +68,24 @@ export default function App() {
 
   // --- Utility View States ---
   const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  const [isAdminAuthorized, setIsAdminAuthorized] = useState<boolean>(() => {
+    return sessionStorage.getItem('olayo_admin_authorized') === 'true';
+  });
   const [activeSection, setActiveSection] = useState<string>('home');
   const [serviceFilterInquiry, setServiceFilterInquiry] = useState<string>('');
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Sync admin authorized state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('olayo_admin_authorized', String(isAdminAuthorized));
+  }, [isAdminAuthorized]);
+
+  // Revoke authorized state when admin mode is turned off
+  useEffect(() => {
+    if (!isAdminMode) {
+      setIsAdminAuthorized(false);
+    }
+  }, [isAdminMode]);
 
   // --- Sync State Hooks ---
   useEffect(() => {
@@ -182,22 +198,33 @@ export default function App() {
       {/* Main Container Views Router */}
       <main className="transition-all">
         {isAdminMode ? (
-          /* Secure bypass Admin CMS workspace panel */
-          <AdminPanel 
-            fuelPrices={fuelPrices}
-            setFuelPrices={setFuelPrices}
-            gallery={gallery}
-            setGallery={setGallery}
-            news={news}
-            setNews={setNews}
-            testimonials={testimonials}
-            setTestimonials={setTestimonials}
-            inquiries={inquiries}
-            setInquiries={setInquiries}
-            setIsAdminMode={setIsAdminMode}
-            branches={branches}
-            setBranches={setBranches}
-          />
+          isAdminAuthorized ? (
+            /* Secure bypass Admin CMS workspace panel */
+            <AdminPanel 
+              fuelPrices={fuelPrices}
+              setFuelPrices={setFuelPrices}
+              gallery={gallery}
+              setGallery={setGallery}
+              news={news}
+              setNews={setNews}
+              testimonials={testimonials}
+              setTestimonials={setTestimonials}
+              inquiries={inquiries}
+              setInquiries={setInquiries}
+              setIsAdminMode={setIsAdminMode}
+              branches={branches}
+              setBranches={setBranches}
+            />
+          ) : (
+            /* Access Gatekeeper Admin authentication login view */
+            <AdminLogin 
+              onLoginSuccess={() => setIsAdminAuthorized(true)}
+              onCancel={() => {
+                setIsAdminMode(false);
+                setIsAdminAuthorized(false);
+              }}
+            />
+          )
         ) : (
           /* Clean, fully responsive corporate website */
           <div className="relative">

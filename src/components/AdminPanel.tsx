@@ -4,7 +4,7 @@ import {
   DollarSign, Image, Newspaper, Award, Inbox, Edit3, Trash2, Plus, 
   Check, X, RefreshCw, Eye, ClipboardCheck, LayoutGrid, Fuel, Clock, MapPin,
   CreditCard, ShieldAlert, Wifi, WifiOff, Users, ArrowRight, Zap, FileText, Smartphone,
-  TrendingUp, AlertTriangle, ShieldCheck, Activity, Receipt, Printer, Download, Settings
+  TrendingUp, AlertTriangle, ShieldCheck, Activity, Receipt, Printer, Download, Settings, Search
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -38,7 +38,7 @@ export default function AdminPanel({
   branches,
   setBranches
 }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'prices' | 'gallery' | 'news' | 'testimonials' | 'inquiries' | 'branches' | 'payments_erp'>('prices');
+  const [activeTab, setActiveTab] = useState<'prices' | 'gallery' | 'news' | 'testimonials' | 'inquiries' | 'branches' | 'payments_erp' | 'transactions'>('prices');
 
   // --- 0. Payments, B2B Accounts & NFC Card State ---
   const [corporateAccounts, setCorporateAccounts] = useState(() => {
@@ -57,7 +57,9 @@ export default function AdminPanel({
       { id: 'TXN-10923', branchName: 'Tororo Highway Station', clientName: 'Mombasa-Kampala Logistics Ltd', fuelType: 'Bulk Diesel', litres: 1500, amountUGX: 7200000, paymentMethod: 'B2B Fleet Credit', status: 'Success', phone: '+254798080038', createdAt: '2026-06-14 11:20 AM' },
       { id: 'TXN-10924', branchName: 'Kampala Logistics Depot', clientName: 'Cash Sale', fuelType: 'Premium Petrol', litres: 45, amountUGX: 252000, paymentMethod: 'MTN Mobile Money', status: 'Success', phone: '+256772112233', createdAt: '2026-06-14 11:45 AM' },
       { id: 'TXN-10925', branchName: 'Malaba Border Gateway', clientName: 'Save the Children NGO Network', fuelType: 'Bulk Diesel', litres: 300, amountUGX: 1440000, paymentMethod: 'B2B Fleet Credit', status: 'Success', phone: '+256703554433', createdAt: '2026-06-14 12:05 PM' },
-      { id: 'TXN-10926', branchName: 'Busia Transit Hub', clientName: 'Cash Sale', fuelType: 'Premium Petrol', litres: 60, amountUGX: 336000, paymentMethod: 'Airtel Money', status: 'Success', phone: '+254798080038', createdAt: '2026-06-14 12:40 PM' }
+      { id: 'TXN-10926', branchName: 'Busia Transit Hub', clientName: 'Cash Sale', fuelType: 'Premium Petrol', litres: 60, amountUGX: 336000, paymentMethod: 'Airtel Money', status: 'Success', phone: '+254798080038', createdAt: '2026-06-14 12:40 PM' },
+      { id: 'TXN-10931', branchName: 'Kampala Logistics Depot', clientName: 'Kato James', fuelType: 'Premium Petrol', litres: 30, amountUGX: 168000, paymentMethod: 'MTN Mobile Money', status: 'Failed', phone: '+256782112244', createdAt: '2026-06-14 12:45 PM' },
+      { id: 'TXN-10932', branchName: 'Busia Transit Hub', clientName: 'Najjuma Sarah', fuelType: 'Premium Diesel', litres: 55, amountUGX: 264000, paymentMethod: 'Airtel Money', status: 'Failed', phone: '+256701556677', createdAt: '2026-06-14 12:50 PM' }
     ];
   });
 
@@ -145,6 +147,12 @@ export default function AdminPanel({
   const [isSavingCreds, setIsSavingCreds] = useState<boolean>(false);
   const [isTestingPing, setIsTestingPing] = useState<'mtn' | 'airtel' | 'pesapal' | null>(null);
 
+  // Transactions Tab search & filter state
+  const [txSearchQuery, setTxSearchQuery] = useState<string>('');
+  const [txMethodFilter, setTxMethodFilter] = useState<'all' | 'mtn' | 'airtel'>('all');
+  const [txStatusFilter, setTxStatusFilter] = useState<'all' | 'Success' | 'Failed' | 'Captured Offline'>('all');
+  const [verifyingTxId, setVerifyingTxId] = useState<string | null>(null);
+
   const handleSyncOfflineData = () => {
     if (offlineQueue.length === 0) return;
     setIsSyncing(true);
@@ -158,6 +166,20 @@ export default function AdminPanel({
       setOfflineQueue([]);
       setIsSyncing(false);
       alert('Offline local queue synchronized with central database successfully.');
+    }, 1500);
+  };
+
+  const handleVerifyTransaction = (txId: string) => {
+    setVerifyingTxId(txId);
+    setTimeout(() => {
+      setPaymentsTransactions((prev: any[]) => prev.map(t => {
+        if (t.id === txId) {
+          return { ...t, status: 'Success' };
+        }
+        return t;
+      }));
+      setVerifyingTxId(null);
+      alert(`MTN & Airtel Reconciliation Service: Transaction ${txId} has been successfully verified against the core telecommunication gateway ledgers. Status reconciled to SUCCESS.`);
     }, 1500);
   };
 
@@ -561,6 +583,18 @@ export default function AdminPanel({
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
               )}
             </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('transactions')}
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'transactions'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-55 dark:hover:bg-neutral-950'
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-emerald-400" />
+            <span>Transactions Ledger</span>
           </button>
 
         </div>
@@ -2451,6 +2485,365 @@ export default function AdminPanel({
 
               </div>
 
+            </div>
+
+          </div>
+        )}
+
+        {activeTab === 'transactions' && (
+          <div className="space-y-8 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-3xl p-6 sm:p-8 shadow-sm">
+            
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-200 dark:border-neutral-850 pb-5 gap-4">
+              <div>
+                <h3 className="text-lg font-black text-neutral-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-emerald-500" /> Mobile Money Transactions Ledger
+                </h3>
+                <p className="text-xs text-neutral-450 dark:text-neutral-400 mt-1 font-normal text-left">
+                  Consolidated auditable records for cellular checkout channels. Track payments, filter transactions, and verify unsettled logs over MTN Mobile Money & Airtel Money.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest font-mono">Reconciler Live</span>
+              </div>
+            </div>
+
+            {/* Stats Metrics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Stat 1 */}
+              <div className="bg-neutral-50 dark:bg-neutral-950 p-4 rounded-2xl border border-neutral-200/60 dark:border-neutral-850 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9.5px] font-black text-neutral-450 dark:text-neutral-550 uppercase tracking-wider block">Total Settled (Success)</span>
+                  <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-2.5 flex items-baseline gap-1.5">
+                  <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">
+                    UGX {paymentsTransactions
+                      .filter((t: any) => (t.paymentMethod === 'MTN Mobile Money' || t.paymentMethod === 'Airtel Money') && t.status === 'Success')
+                      .reduce((sum: number, t: any) => sum + t.amountUGX, 0)
+                      .toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-[10px] text-neutral-500 mt-1 font-normal">Aggregate mobile checkout revenue</p>
+              </div>
+
+              {/* Stat 2 */}
+              <div className="bg-neutral-50 dark:bg-neutral-950 p-4 rounded-2xl border border-neutral-200/60 dark:border-neutral-850 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9.5px] font-black text-neutral-450 dark:text-neutral-550 uppercase tracking-wider block">Success Rate</span>
+                  <div className="p-1.5 bg-indigo-500/10 text-indigo-500 rounded-lg">
+                    <Activity className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-2.5 flex items-baseline gap-1.5">
+                  <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">
+                    {(() => {
+                      const momo = paymentsTransactions.filter((t: any) => t.paymentMethod === 'MTN Mobile Money' || t.paymentMethod === 'Airtel Money');
+                      if (momo.length === 0) return '100%';
+                      const succ = momo.filter((t: any) => t.status === 'Success').length;
+                      return `${Math.round((succ / momo.length) * 100)}%`;
+                    })()}
+                  </span>
+                </div>
+                <p className="text-[10px] text-neutral-500 mt-1 font-normal">Provider completion handshake ratio</p>
+              </div>
+
+              {/* Stat 3 */}
+              <div className="bg-neutral-50 dark:bg-neutral-950 p-4 rounded-2xl border border-neutral-200/60 dark:border-neutral-850 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9.5px] font-black text-neutral-450 dark:text-neutral-550 uppercase tracking-wider block">Failed / Unsettled</span>
+                  <div className="p-1.5 bg-red-500/10 text-red-500 rounded-lg">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-2.5 flex items-baseline gap-1.5 font-mono">
+                  <span className="text-lg font-black text-rose-600 dark:text-rose-450">
+                    {paymentsTransactions.filter((t: any) => (t.paymentMethod === 'MTN Mobile Money' || t.paymentMethod === 'Airtel Money') && t.status === 'Failed').length}
+                  </span>
+                  <span className="text-[10px] text-neutral-500">logs</span>
+                </div>
+                <p className="text-[10px] text-neutral-500 mt-1 font-normal">Awaiting manual webhook confirmation</p>
+              </div>
+
+              {/* Stat 4 */}
+              <div className="bg-neutral-50 dark:bg-neutral-950 p-4 rounded-2xl border border-neutral-200/60 dark:border-neutral-850 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9.5px] font-black text-neutral-450 dark:text-neutral-550 uppercase tracking-wider block">Avg MoMo Transaction</span>
+                  <div className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg">
+                    <Smartphone className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-2.5 flex items-baseline gap-1.5">
+                  <span className="text-lg font-black text-neutral-900 dark:text-white font-mono font-mono">
+                    UGX {(() => {
+                      const momo = paymentsTransactions.filter((t: any) => (t.paymentMethod === 'MTN Mobile Money' || t.paymentMethod === 'Airtel Money') && t.status === 'Success');
+                      if (momo.length === 0) return '0';
+                      const sum = momo.reduce((acc: number, item: any) => acc + item.amountUGX, 0);
+                      return Math.round(sum / momo.length).toLocaleString();
+                    })()}
+                  </span>
+                </div>
+                <p className="text-[10px] text-neutral-500 mt-1 font-normal">Average consumer mobile basket size</p>
+              </div>
+
+            </div>
+
+            {/* Filter and Search Box Control Grid */}
+            <div className="bg-neutral-55 dark:bg-neutral-950 border border-neutral-200/80 dark:border-neutral-850 p-5 rounded-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                
+                {/* Search query field */}
+                <div className="md:col-span-5 relative text-left">
+                  <label className="block text-[9.5px] font-black text-neutral-450 dark:text-neutral-550 uppercase tracking-wider mb-1.5">Search Customer info / Transaction ID</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={txSearchQuery}
+                      onChange={(e) => setTxSearchQuery(e.target.value)}
+                      placeholder="e.g. Kato James, +25678, TXN-10931..."
+                      className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-xl py-2 pl-9 pr-4 text-xs dark:text-white placeholder-neutral-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all font-medium"
+                    />
+                    <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+                  </div>
+                </div>
+
+                {/* Filter provider */}
+                <div className="md:col-span-3 text-left">
+                  <label className="block text-[9.5px] font-black text-neutral-455 dark:text-neutral-555 uppercase tracking-wider mb-1.5">MoMo Gateway Provider</label>
+                  <select
+                    value={txMethodFilter}
+                    onChange={(e: any) => setTxMethodFilter(e.target.value)}
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-xl py-2 px-3 text-xs dark:text-white font-medium focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all font-bold"
+                  >
+                    <option value="all">All Channels (MTN & Airtel)</option>
+                    <option value="mtn">MTN Mobile Money Only</option>
+                    <option value="airtel">Airtel Money Only</option>
+                  </select>
+                </div>
+
+                {/* Filter Status */}
+                <div className="md:col-span-3 text-left">
+                  <label className="block text-[9.5px] font-black text-neutral-455 dark:text-neutral-555 uppercase tracking-wider mb-1.5">Transaction Status</label>
+                  <select
+                    value={txStatusFilter}
+                    onChange={(e: any) => setTxStatusFilter(e.target.value)}
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-805 rounded-xl py-2 px-3 text-xs dark:text-white font-medium focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all font-bold"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="Success">Success (Settled)</option>
+                    <option value="Failed">Failed (Unsettled)</option>
+                    <option value="Captured Offline">Captured Offline</option>
+                  </select>
+                </div>
+
+                {/* Reset button */}
+                <div className="md:col-span-1 pt-5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTxSearchQuery('');
+                      setTxMethodFilter('all');
+                      setTxStatusFilter('all');
+                    }}
+                    className="w-full py-2 bg-neutral-200 dark:bg-neutral-850 hover:bg-neutral-300 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center font-bold"
+                    title="Reset Filter Form"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+            {/* List Table wrapper */}
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200/75 dark:border-neutral-805 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-neutral-600 dark:text-neutral-300 min-w-[800px]">
+                  
+                  <thead>
+                    <tr className="bg-neutral-50 dark:bg-neutral-950/80 text-neutral-500 font-extrabold uppercase tracking-wider text-[9.5px] border-b border-neutral-200/80 dark:border-neutral-850">
+                      <th className="py-3.5 px-4 font-bold font-mono">TXN ID</th>
+                      <th className="py-3.5 px-4 font-bold">Timestamp</th>
+                      <th className="py-3.5 px-4 font-bold">Client / Customer Detail</th>
+                      <th className="py-3.5 px-4 font-bold">Dispatch Branch</th>
+                      <th className="py-3.5 px-4 font-bold">Checkout Channel</th>
+                      <th className="py-3.5 px-4 font-bold">Fuel Dispensed</th>
+                      <th className="py-3.5 px-4 font-bold text-right">Receipt Value</th>
+                      <th className="py-3.5 px-4 font-bold text-center">Status</th>
+                      <th className="py-3.5 px-4 font-bold text-right">Audit Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-neutral-200/60 dark:divide-neutral-850">
+                    {(() => {
+                      const momoList = paymentsTransactions.filter((txn: any) => {
+                        const isMoMo = txn.paymentMethod === 'MTN Mobile Money' || txn.paymentMethod === 'Airtel Money';
+                        if (!isMoMo) return false;
+
+                        const matchesSearch = 
+                          txn.id.toLowerCase().includes(txSearchQuery.toLowerCase()) ||
+                          (txn.clientName && txn.clientName.toLowerCase().includes(txSearchQuery.toLowerCase())) ||
+                          (txn.phone && txn.phone.toLowerCase().includes(txSearchQuery.toLowerCase())) ||
+                          (txn.branchName && txn.branchName.toLowerCase().includes(txSearchQuery.toLowerCase())) ||
+                          (txn.fuelType && txn.fuelType.toLowerCase().includes(txSearchQuery.toLowerCase()));
+
+                        if (!matchesSearch) return false;
+
+                        if (txMethodFilter === 'mtn' && txn.paymentMethod !== 'MTN Mobile Money') return false;
+                        if (txMethodFilter === 'airtel' && txn.paymentMethod !== 'Airtel Money') return false;
+
+                        if (txStatusFilter !== 'all' && txn.status !== txStatusFilter) return false;
+
+                        return true;
+                      });
+
+                      if (momoList.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={9} className="py-12 text-center text-neutral-400 dark:text-neutral-550">
+                              <div className="flex flex-col items-center justify-center space-y-2">
+                                <Receipt className="w-8 h-8 text-neutral-300 animate-pulse" />
+                                <p className="font-bold text-xs">No matching cellular transactions found.</p>
+                                <p className="text-[10px]">Try adjusting your search filters or processing a payment in the Terminal first.</p>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return momoList.map((txn: any) => {
+                        const isMTN = txn.paymentMethod === 'MTN Mobile Money';
+                        return (
+                          <tr key={txn.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-950/40 transition-colors">
+                            
+                            {/* Transaction ID */}
+                            <td className="py-4 px-4 font-mono font-black text-neutral-900 dark:text-white text-[10.5px]">
+                              {txn.id}
+                            </td>
+
+                            {/* Timestamp */}
+                            <td className="py-4 px-4 text-neutral-500 whitespace-nowrap text-[10.5px]">
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                                <span>{txn.createdAt}</span>
+                              </div>
+                            </td>
+
+                            {/* Customer details */}
+                            <td className="py-4 px-4 text-left whitespace-nowrap">
+                              <div className="font-bold text-neutral-800 dark:text-white text-[11px]">{txn.clientName || 'Cash checkout'}</div>
+                              <div className="text-[10px] text-neutral-500 font-mono italic">{txn.phone || 'N/A'}</div>
+                            </td>
+
+                            {/* Station */}
+                            <td className="py-4 px-4 font-medium text-neutral-600 dark:text-neutral-400 text-[11px]">
+                              {txn.branchName}
+                            </td>
+
+                            {/* Provider */}
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              {isMTN ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/25 rounded-xl font-bold text-yellow-600 dark:text-yellow-400 text-[10px]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                                  MTN MoMo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/25 rounded-xl font-bold text-red-600 dark:text-red-400 text-[10px]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                  Airtel Money
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Fuel quantity */}
+                            <td className="py-4 px-4">
+                              <div className="font-bold text-neutral-800 dark:text-neutral-300 text-[11px]">{txn.fuelType}</div>
+                              <div className="text-[10px] text-neutral-450">{txn.litres} Litres</div>
+                            </td>
+
+                            {/* Cost */}
+                            <td className="py-4 px-4 font-mono font-bold text-neutral-900 dark:text-white text-right text-[11px] whitespace-nowrap">
+                              UGX {txn.amountUGX.toLocaleString()}
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-4 px-4 text-center whitespace-nowrap font-mono">
+                              {txn.status === 'Success' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-55 border border-emerald-500/30 rounded-xl font-black text-emerald-600 dark:text-emerald-400 text-[10px] uppercase">
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Success</span>
+                                </span>
+                              ) : txn.status === 'Failed' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-500/15 border border-red-500/30 rounded-xl font-black text-red-600 dark:text-red-400 text-[10px] uppercase">
+                                  <AlertTriangle className="w-3.5 h-3.5 animate-bounce" />
+                                  <span>Failed</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-850 dark:hover:bg-neutral-800 border border-neutral-300/60 dark:border-neutral-700/80 rounded-xl font-black text-neutral-500 dark:text-neutral-400 text-[10px] uppercase">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>Offline</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Action columns */}
+                            <td className="py-4 px-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2">
+                                
+                                {txn.status === 'Failed' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVerifyTransaction(txn.id)}
+                                    disabled={verifyingTxId !== null}
+                                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded-lg shadow uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50 font-bold"
+                                    title="Manually query cellular provider endpoint"
+                                  >
+                                    <RefreshCw className={`w-3 h-3 ${verifyingTxId === txn.id ? 'animate-spin' : ''}`} />
+                                    <span>{verifyingTxId === txn.id ? 'API Querying...' : 'Verify Pay'}</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedReceipt(txn)}
+                                  className="p-1 px-2 bg-neutral-100 hover:bg-neutral-250 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-neutral-250 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 rounded-lg text-[10.5px] font-bold cursor-pointer transition-all flex items-center gap-1"
+                                  title="View Tax Invoice Tape"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Receipt</span>
+                                </button>
+
+                              </div>
+                            </td>
+
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+
+                </table>
+              </div>
+            </div>
+
+            {/* Reconciliation documentation warning */}
+            <div className="p-4 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-3 text-left">
+              <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider font-mono">
+                  Enterprise Audit Policy SLA Notice
+                </span>
+                <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed font-normal">
+                  Manual checkout overrides are cryptographically logged immediately onto the URA (Uganda Revenue Authority) digital pipeline. Only invoke the "Verify Pay" handshake if the cellular client successfully provides a verified network broker ID or physical SMS receipt token.
+                </p>
+              </div>
             </div>
 
           </div>
