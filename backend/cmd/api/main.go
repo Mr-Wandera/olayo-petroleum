@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	"github.com/olayopetroleum/backend/internal/domain"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -241,31 +241,51 @@ func handleLogin(c *gin.Context) {
 	})
 }
 
-func handleTokenRefresh(c *gin.Context)         { c.JSON(http.StatusOK, gin.H{"token": "newSignatureToken"}) }
-func handlePasswordReset(c *gin.Context)        { c.JSON(http.StatusOK, gin.H{"status": "Password reset link sent"}) }
-func handleMFAValidation(c *gin.Context)        { c.JSON(http.StatusOK, gin.H{"status": "MFA verified"}) }
-func listBranches(c *gin.Context)               { c.JSON(http.StatusOK, gin.H{"branches": []string{"Tororo", "Malaba", "Busia", "Kampala"}}) }
-func createBranch(c *gin.Context)              { c.JSON(http.StatusCreated, gin.H{"status": "Branch added"}) }
-func getBranchDetails(c *gin.Context)          { c.JSON(http.StatusOK, gin.H{"branch_id": c.Param("id")}) }
-func getBranchTelemetry(c *gin.Context)        { c.JSON(http.StatusOK, gin.H{"sensor_status": "ONLINE", "leak_status": "NONE"}) }
-func listInventory(c *gin.Context)             { c.JSON(http.StatusOK, gin.H{"inventory": []string{"Diesel G-01", "Premium Petrol", "Lube Box"}}) }
-func recordFuelDelivery(c *gin.Context)        { c.JSON(http.StatusCreated, gin.H{"status": "Fuel delivery loaded successfully"}) }
-func executeFuelReconciliation(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"variance": 0.0, "status": "APPROVED"}) }
-func listLowStockAlerts(c *gin.Context)        { c.JSON(http.StatusOK, gin.H{"low_stock_alerts": []string{}}) }
-func listTankers(c *gin.Context)               { c.JSON(http.StatusOK, gin.H{"tankers": []string{"UBL 324A", "UAM 563F"}}) }
-func dispatchTanker(c *gin.Context)            { c.JSON(http.StatusAccepted, gin.H{"status": "Cargo dispatched"}) }
-func updateTankerGPS(c *gin.Context)           { c.JSON(http.StatusOK, gin.H{"gps": "tracked"}) }
-func getTankerDeliveries(c *gin.Context)       { c.JSON(http.StatusOK, gin.H{"deliveries": []string{}}) }
-func listWorkOrders(c *gin.Context)            { c.JSON(http.StatusOK, gin.H{"orders": []string{}}) }
-func createWorkOrder(c *gin.Context)           { c.JSON(http.StatusCreated, gin.H{"status": "Work order loaded"}) }
-func updateWorkOrderStatus(c *gin.Context)     { c.JSON(http.StatusOK, gin.H{"status": "Status updated"}) }
-func listWashRecords(c *gin.Context)            { c.JSON(http.StatusOK, gin.H{"services": []string{}}) }
-func createWashRecord(c *gin.Context)           { c.JSON(http.StatusCreated, gin.H{"status": "Wash booked"}) }
-func listStoreProducts(c *gin.Context)          { c.JSON(http.StatusOK, gin.H{"products": []string{}}) }
-func recordStoreSale(c *gin.Context)            { c.JSON(http.StatusCreated, gin.H{"status": "Sale completed"}) }
-func listCorporateContracts(c *gin.Context)     { c.JSON(http.StatusOK, gin.H{"contracts": []string{}}) }
-func createCorporateContract(c *gin.Context)    { c.JSON(http.StatusCreated, gin.H{"status": "Contract created"}) }
-func chargeContractCreditLine(c *gin.Context)   { c.JSON(http.StatusOK, gin.H{"status": "Transaction debited"}) }
+func handleTokenRefresh(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"token": "newSignatureToken"}) }
+func handlePasswordReset(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "Password reset link sent"})
+}
+func handleMFAValidation(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "MFA verified"}) }
+func listBranches(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"branches": []string{"Tororo", "Malaba", "Busia", "Kampala"}})
+}
+func createBranch(c *gin.Context)     { c.JSON(http.StatusCreated, gin.H{"status": "Branch added"}) }
+func getBranchDetails(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"branch_id": c.Param("id")}) }
+func getBranchTelemetry(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"sensor_status": "ONLINE", "leak_status": "NONE"})
+}
+func listInventory(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"inventory": []string{"Diesel G-01", "Premium Petrol", "Lube Box"}})
+}
+func recordFuelDelivery(c *gin.Context) {
+	c.JSON(http.StatusCreated, gin.H{"status": "Fuel delivery loaded successfully"})
+}
+func executeFuelReconciliation(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"variance": 0.0, "status": "APPROVED"})
+}
+func listLowStockAlerts(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"low_stock_alerts": []string{}}) }
+func listTankers(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"tankers": []string{"UBL 324A", "UAM 563F"}})
+}
+func dispatchTanker(c *gin.Context)      { c.JSON(http.StatusAccepted, gin.H{"status": "Cargo dispatched"}) }
+func updateTankerGPS(c *gin.Context)     { c.JSON(http.StatusOK, gin.H{"gps": "tracked"}) }
+func getTankerDeliveries(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"deliveries": []string{}}) }
+func listWorkOrders(c *gin.Context)      { c.JSON(http.StatusOK, gin.H{"orders": []string{}}) }
+func createWorkOrder(c *gin.Context) {
+	c.JSON(http.StatusCreated, gin.H{"status": "Work order loaded"})
+}
+func updateWorkOrderStatus(c *gin.Context)  { c.JSON(http.StatusOK, gin.H{"status": "Status updated"}) }
+func listWashRecords(c *gin.Context)        { c.JSON(http.StatusOK, gin.H{"services": []string{}}) }
+func createWashRecord(c *gin.Context)       { c.JSON(http.StatusCreated, gin.H{"status": "Wash booked"}) }
+func listStoreProducts(c *gin.Context)      { c.JSON(http.StatusOK, gin.H{"products": []string{}}) }
+func recordStoreSale(c *gin.Context)        { c.JSON(http.StatusCreated, gin.H{"status": "Sale completed"}) }
+func listCorporateContracts(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"contracts": []string{}}) }
+func createCorporateContract(c *gin.Context) {
+	c.JSON(http.StatusCreated, gin.H{"status": "Contract created"})
+}
+func chargeContractCreditLine(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "Transaction debited"})
+}
 func generateSalesPercentageReport(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"report_url": "https://storage.olayo.corp/reports/report_49.pdf"})
 }
